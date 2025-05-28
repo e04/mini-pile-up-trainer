@@ -10,10 +10,15 @@ const AppContent: React.FC = () => {
   const [inputKey, setInputKey] = useState<number>(0); // Key to force InputArea re-render
   const [currentNumberOfCallsigns, setCurrentNumberOfCallsigns] =
     useState<number>(5); // State to hold number of callsigns from PileupPlayer
+  const [startPileupFn, setStartPileupFn] = useState<(() => void) | null>(null); // Store startPileup function
   useTheme();
 
   const handleNumberOfCallsignsChange = useCallback((num: number) => {
     setCurrentNumberOfCallsigns(num);
+  }, []);
+
+  const handlePlayerReady = useCallback((startPileup: () => void) => {
+    setStartPileupFn(() => startPileup);
   }, []);
 
   const generateNewProblem = useCallback(() => {
@@ -40,16 +45,30 @@ const AppContent: React.FC = () => {
       setRemainingCallsigns(newRemainingCallsigns);
       setFeedbackMessage(`"${submittedCallsign}" - Correct!`);
       setInputKey((prevKey) => prevKey + 1); // Clear input on correct answer
+      
       if (newRemainingCallsigns.length === 0) {
+        // 最後の正解時は再生しない
         setFeedbackMessage(
           "All callsigns identified! Generating new problem..."
         );
         setTimeout(() => generateNewProblem(), 2000); // Generate new problem after a short delay
+      } else {
+        // まだコールサインが残っている場合のみ1秒後に再生
+        if (startPileupFn) {
+          setTimeout(() => {
+            startPileupFn();
+          }, 1000);
+        }
       }
     } else {
-      // Incorrect answer
+      // Incorrect answer - 不正解時も1秒後に再生
       setFeedbackMessage(`"${submittedCallsign}" - Incorrect. Try again.`);
       // Do not clear input on incorrect answer
+      if (startPileupFn) {
+        setTimeout(() => {
+          startPileupFn();
+        }, 1000);
+      }
     }
   };
 
@@ -69,6 +88,7 @@ const AppContent: React.FC = () => {
           <Player
             callsignsToPlay={remainingCallsigns}
             onNumberOfCallsignsChange={handleNumberOfCallsignsChange} // Pass the handler
+            onPlayerReady={handlePlayerReady} // Pass the player ready handler
           />
           <InputArea
             key={inputKey} // Use key to force re-render and clear input

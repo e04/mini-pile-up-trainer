@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   createAudioContext,
   playMorseCodeWithFrequency,
@@ -8,11 +8,13 @@ import {
 interface PileupPlayerProps {
   callsignsToPlay: string[];
   onNumberOfCallsignsChange: (num: number) => void; // Add this prop
+  onPlayerReady?: (startPileup: () => void) => void; // Callback to expose startPileup function
 }
 
 const Player: React.FC<PileupPlayerProps> = ({
   callsignsToPlay,
   onNumberOfCallsignsChange,
+  onPlayerReady,
 }) => {
   const [wpm, setWpm] = useState<number>(20);
   const [numberOfCallsigns, setNumberOfCallsigns] = useState<number>(5); // New state for number of callsigns
@@ -26,45 +28,7 @@ const Player: React.FC<PileupPlayerProps> = ({
     onNumberOfCallsignsChange(numberOfCallsigns);
   }, [numberOfCallsigns, onNumberOfCallsignsChange]);
 
-  // Effect to ensure audio context is resumed on user interaction
-  useEffect(() => {
-    const resumeAudioContext = async () => {
-      if (
-        audioContextRef.current &&
-        audioContextRef.current.state === "suspended"
-      ) {
-        await audioContextRef.current.resume();
-      }
-    };
-    document.addEventListener("click", resumeAudioContext);
-    return () => {
-      document.removeEventListener("click", resumeAudioContext);
-    };
-  }, []);
-
-  // Effect to handle spacebar key press for play functionality
-  useEffect(() => {
-    const handleKeyPress = (event: KeyboardEvent) => {
-      if (event.code === "Space" && !isPlaying && callsignsToPlay.length > 0) {
-        event.preventDefault(); // Prevent page scrolling
-        startPileup();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyPress);
-    return () => {
-      document.removeEventListener("keydown", handleKeyPress);
-    };
-  }, [isPlaying, callsignsToPlay.length]);
-
-  // Remove automatic playback - users must click Play button
-  // useEffect(() => {
-  //   if (triggerPlayback && callsignsToPlay.length > 0 && !isPlaying) {
-  //     startPileup();
-  //   }
-  // }, [triggerPlayback, callsignsToPlay, isPlaying]);
-
-  const startPileup = async () => {
+  const startPileup = useCallback(async () => {
     setIsPlaying(true);
 
     if (!audioContextRef.current) {
@@ -113,7 +77,45 @@ const Player: React.FC<PileupPlayerProps> = ({
     setTimeout(() => {
       setIsPlaying(false);
     }, timeToWait);
-  };
+  }, [callsignsToPlay, wpm]);
+
+  // Expose startPileup function to parent component
+  useEffect(() => {
+    if (onPlayerReady) {
+      onPlayerReady(startPileup);
+    }
+  }, [onPlayerReady, startPileup]);
+
+  // Effect to ensure audio context is resumed on user interaction
+  useEffect(() => {
+    const resumeAudioContext = async () => {
+      if (
+        audioContextRef.current &&
+        audioContextRef.current.state === "suspended"
+      ) {
+        await audioContextRef.current.resume();
+      }
+    };
+    document.addEventListener("click", resumeAudioContext);
+    return () => {
+      document.removeEventListener("click", resumeAudioContext);
+    };
+  }, []);
+
+  // Effect to handle spacebar key press for play functionality
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (event.code === "Space" && !isPlaying && callsignsToPlay.length > 0) {
+        event.preventDefault(); // Prevent page scrolling
+        startPileup();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyPress);
+    return () => {
+      document.removeEventListener("keydown", handleKeyPress);
+    };
+  }, [isPlaying, callsignsToPlay.length, startPileup]);
 
   return (
     <div className="pileup-player">
