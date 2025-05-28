@@ -4,7 +4,7 @@ A web application for practicing Morse code (CW) pile-up situations. This simula
 
 ## How to Use
 
-## 1. Open URL
+### 1. Open URL
 
 https://e04.github.io/mini-pile-up-trainer/dist/index.html
 
